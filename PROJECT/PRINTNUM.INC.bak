@@ -1,0 +1,145 @@
+;//PRINT NUMBER COMMAND 
+PRINT_NUMBER MACRO NUMHEX,REG,NUM_TO_DISP,ROW,COL
+ LOCAL PRLOOP
+
+;;CODE SHIFTING NUMBER
+    LEA DI,NUM_TO_DISP
+    MOV BX,REG
+    SHR BX,12  
+    MOV [DI],BL
+    INC DI 
+    MOV BX,REG
+    SHL BX,4
+    SHR BX,12 
+    MOV [DI],BL
+    INC DI  
+    MOV BX,REG    
+    SHL BX,8
+    SHR BX,12 
+    MOV [DI],BL
+    INC DI  
+    MOV BX,REG    
+    SHL BX,12
+    SHR BX,12 
+    MOV [DI],BL  
+	
+    MOV CX,4             ;NO OF LOOPS   
+    LEA DI,NUM_TO_DISP   ;MOVE OFFSET OF NUM TO DISPLAY
+    MOV DH,ROW           ;INTIALIZE COL AND row
+    MOV DL,COL
+	
+	PRLOOP:
+    ;;PRINT NUMBER 
+    MOV AL,[DI] 
+    LEA BX,NUMHEX
+    XLAT
+    INC DI  
+    PUSH CX
+    
+    ;;MOVE CURSOR POS 
+    
+    MOV AH,2
+	MOV BH,0
+    INT 10H
+    
+    ;;display char
+	MOV BL,73H
+	MOV BH,BL
+    MOV CL,4
+    SHR BH,CL
+    mov ah,9
+    MOV CX,1
+    int 10h 
+    
+    INC DL
+    POP CX
+    LOOP  PRLOOP
+ENDM PRINT_NUMBER
+
+
+
+;//READ FROM command from user
+READ_COMMAND MACRO COM_MESS,A_SIZE,COL
+    LOCAL READING,EXIT1,NOT_EXIT,BACKSPACE,P_UP
+
+    LEA DI,COM_MESS
+	LEA SI,A_SIZE
+	MOV [SI],0
+    MOV DL,COL
+	READING:
+	MOV AH,1
+	INT 16H
+	JZ FAR PTR READING                         ;7ATETHA HENA 3SHAN COMPARE CHECK LAZEM YEKON BA3D INTRUPT 
+	;//if backspace
+	CMP AL,8
+	JZ BACKSPACE
+	;//IF F4
+	CMP AH,3EH
+	JZ EXIT1 
+	;//IF F2
+	CMP AH,3CH
+	JZ P_UP
+	;//IF ENTER KEY
+	CMP AH,1CH
+	JZ FAR PTR NOT_EXIT
+	
+	MOV [DI],AL
+	MOVE_CURSOR 21,DL
+	MOV BL,06H   
+	MOV BH,BL
+    MOV CL,4
+    SHR BH,CL
+    mov ah,9
+    MOV CX,1
+    int 10h 
+	mov ah,0                             ;CONSUME BUFFER
+    int 16h
+	INC DL
+	INC DI
+	;//ACTUAL SIZE
+	MOV CL,[SI]
+	INC CL
+	MOV [SI],CL
+	JMP FAR PTR READING
+	
+	BACKSPACE:
+	mov ah,0                             ;CONSUME BUFFER
+    int 16h
+	DEC DL
+	MOVE_CURSOR 21,DL
+    MOV BL,00H
+	MOV BH,BL
+    MOV CL,4
+    SHR BH,CL
+    mov ah,9
+    MOV CX,1
+    int 10h 
+	DEC DI
+	MOV [DI],'$'
+	;ACTUAL SIZE
+	MOV CL,[SI]
+	DEC CL
+	MOV [SI],CL
+	JMP FAR PTR READING
+	
+	P_UP:
+	mov ah,0                             ;CONSUME BUFFER
+    int 16h
+	MOV AH,[SI]
+	CMP AH,0
+	JNZ READING
+	JMP FAR PTR POWER_UP
+	
+	EXIT1:
+	mov ah,0                             ;CONSUME BUFFER
+    int 16h
+	JMP FAR PTR IF_F4_PRESSED
+	
+	NOT_EXIT:
+	mov ah,0                             ;CONSUME BUFFER
+    int 16h
+	
+ENDM READ_COMMAND
+
+
+

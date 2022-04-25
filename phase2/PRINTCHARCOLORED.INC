@@ -1,0 +1,11 @@
+PRINT_CHAR_COLORED MACRO 
+    PUSHA
+    MOV BL,73H
+	MOV BH,BL
+    MOV CL,4
+    SHR BH,CL
+    mov ah,9
+    MOV CX,1
+    int 10h 
+	POPA
+ENDM PRINT_CHAR_COLORED

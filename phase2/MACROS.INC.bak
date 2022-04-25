@@ -1,0 +1,249 @@
+;//DISPLAY USERNAME MESSGAGE 
+DISPLAY_MESS MACRO MESS 
+MOV AH,9
+LEA DX,MESS
+INT 21H
+ENDM  DISPLAY_MESS
+
+;//DISPLAY USERNAME MESSGAGE IF GIVEN MAX SIZE AND ACTUAL
+DISPLAY_MESS1 MACRO MESS 
+MOV AH,9
+LEA DX,MESS+2
+INT 21H
+ENDM DISPLAY_MESS1
+
+;//READ FROM string from user
+READ_USERNAME MACRO NMESS
+    
+    MOV AH,0AH
+    LEA DX,NMESS
+    INT 21H
+	
+ENDM READ_USERNAME
+
+
+
+;//READ FROM command from user
+READ_COMMAND MACRO COM_MESS,A_SIZE,COL
+    LOCAL READING,EXIT1,NOT_EXIT,BACKSPACE,P_UP
+
+    LEA DI,COM_MESS
+	LEA SI,A_SIZE
+	MOV [SI],0
+    MOV DL,COL
+	READING:
+	MOV AH,1
+	INT 16H
+	JZ FAR PTR READING                         ;7ATETHA HENA 3SHAN COMPARE CHECK LAZEM YEKON BA3D INTRUPT 
+	;//if backspace
+	CMP AL,8
+	JZ BACKSPACE
+	;//IF F4
+	CMP AH,3EH
+	JZ EXIT1 
+	;//IF F2
+	CMP AH,3CH
+	JZ P_UP
+	;//if F3
+	CMP AH,3DH
+	JZ INCHAT
+	;//IF ENTER KEY
+	CMP AH,1CH
+	JZ FAR PTR NOT_EXIT
+	
+	MOV [DI],AL
+	MOVE_CURSOR 21,DL
+	MOV BL,06H   
+	MOV BH,BL
+    MOV CL,4
+    SHR BH,CL
+    mov ah,9
+    MOV CX,1
+    int 10h 
+	mov ah,0                             ;CONSUME BUFFER
+    int 16h
+	INC DL
+	INC DI
+	;//ACTUAL SIZE
+	MOV CL,[SI]
+	INC CL
+	MOV [SI],CL
+	JMP FAR PTR READING
+	
+	BACKSPACE:
+	mov ah,0                             ;CONSUME BUFFER
+    int 16h
+	DEC DL
+	MOVE_CURSOR 21,DL
+    MOV BL,0
+	MOV BH,BL
+    MOV CL,4
+    SHR BH,CL
+    mov ah,9
+    MOV CX,1
+    int 10h 
+	DEC DI
+	MOV [DI],'$'
+	;ACTUAL SIZE
+	MOV CL,[SI]
+	DEC CL
+	MOV [SI],CL
+	JMP FAR PTR READING
+	
+	P_UP:
+	mov ah,0                             ;CONSUME BUFFER
+    int 16h
+	MOV AH,[SI]
+	CMP AH,0
+	JNZ READING
+	JMP FAR PTR POWER_UP
+	
+	INCHAT:
+	MOV AH,0
+	INT 16H
+	JMP FAR PTR IN_GAME_CHAT
+	
+	EXIT1:
+	mov ah,0                             ;CONSUME BUFFER
+    int 16h
+	JMP FAR PTR IF_F4_PRESSED
+	
+	NOT_EXIT:
+	mov ah,0                             ;CONSUME BUFFER
+    int 16h
+	
+ENDM READ_COMMAND
+
+;//READ POINTS FORM USER 00-99
+READ_POINTS MACRO NUM,NUMCONVERTED
+    LOCAL CONVERT,CONVERTWHOLE
+    MOV AH,0AH
+    LEA DX,NUM
+    INT 21H
+	;CONVERT FROM ASCII TO DECIMAL NUMBER
+    LEA SI,NUM+3
+    MOV CX,NUMBER_SIZE
+    MOV BL,1
+    CONVERT:
+    MOV AL,[SI] ; Get least significant digit
+    SUB AL,30H  ; Convert to decimal
+    MUL BL      ; Get exponent
+    MOV [SI],AL ; Write back result
+    MOV AL,BL   ; Multiply BL * 10
+    MOV BH,10
+    MUL BH
+    MOV BL,AL
+    DEC SI      ; Get next higher significant digit
+    LOOP CONVERT
+	;CONVERT FROM DECIMAL TO WHOLE DECIMAL 10,8 -> 18
+    MOV CX,(NUMBER_SIZE-1)
+    LEA SI,NUM+3
+    LEA DI,NUMCONVERTED
+    CONVERTWHOLE:
+    MOV AL,[SI] ;Get first num
+    DEC SI      
+    MOV BL,[SI] ;Get second num
+    MOV DL,[DI] ;Get previous sum
+    ADD DL,BL
+    ADD DL,AL   ; DL = AL + BL + DL
+    MOV [DI],DL ; Write back result and repeat
+    LOOP CONVERTWHOLE
+    LEA DI,NUMCONVERTED
+ENDM READ_POINTS
+
+;//PRINT CHAR FOR PRINTING POINTS NUM BY NUM
+PRINT_CHAR MACRO 
+    mov ah,2
+	mov dl,AL
+	int 21h
+ENDM PRINT_CHAR
+
+;//PRINT POINTS OF PLAYERS ON THE SCREEN
+PRINT_POINTS MACRO NUM,temp,ROW,COL
+	MOV AL,NUM
+	MOV AH,00
+	MOV BL,10
+	;PRINT 1ST DIGIT
+	DIV BL
+	MOV temp,AH ;BACKUP REMAINDER
+	
+	ADD AL,30H
+	;;MOVE CURSOR POS 
+    MOV DH,ROW           ;INTIALIZE COL AND row
+    MOV DL,COL
+    MOV AH,2
+	MOV BH,0
+    INT 10H
+	CALL PRINT_COL_NUM
+	INC DL
+	MOV AL,temp ;GET REMAINDER
+	ADD AL,30H
+	MOV AH,2
+	MOV BH,0
+    INT 10H
+	CALL PRINT_COL_NUM
+ENDM PRINT_POINTS
+
+;//MOVE CURSOR
+MOVE_CURSOR MACRO ROW,COL
+    MOV AH,2
+	MOV BH,0
+    MOV DH,ROW
+    MOV DL,COL
+    INT 10H
+ENDM MOVE_CURSOR
+
+;//UPPPER TO LOWER ASCII CODE
+UP_TO_LOW MACRO UP,LOW,ACTUAL_SIZE
+    LOCAL IFLOWER,UPPER,LOWER,ABOVE
+    lea SI,UP             ;move offeset of INPUTSTRING to SI
+    lea DI,LOW             ;move offeset of RESULTSTRING to DI
+    mov cL,ACTUAL_SIZE       ;Length of string   
+	MOV CH,0
+    clc                      ;CLEAR carry
+	
+	
+       IFLOWER: 
+       mov bl,[SI]           ;move char from inputstring to bL
+       cmp bl,64D            ;CHECK IF char is space where 20h is space
+       jA ABOVE              ;if char is space move it to resultstring
+       JMP LOWER
+	   
+       UPPER: 
+	   add bl,20h  ;convert upper to lowercase char
+	   JMP LOWER
+	   
+	   ABOVE:
+	   CMP BL,91D
+	   JB UPPER 
+  
+    LOWER:
+    mov [DI],bl              ;move lowercase char to resultstring
+    inc SI                   ;move to next char in INPUTSTRING
+    inc DI                   ;move to next memory place in RESULTSTRING
+    loop IFLOWER
+                         
+
+ENDM UP_TO_LOW
+
+;//DISPLAY STRING IN GRAPHICS MODE
+DISPLAY_GRAPH MACRO MESS,SIZE,ROW,COL
+    MOV AX,@DATA
+    MOV ES,AX
+	
+    mov al, 1                  ;WRITE MODE=1
+	mov bh, 0                  ;PAGE NO
+	mov bl, 06H                ;color
+	mov cL, SIZE               ;message size.
+	mov dh, ROW                ;Row
+	mov dl, COL                ;COL
+	mov bp, offset MESS        ;OFFSET MESS
+	mov ah, 13h
+	int 10h
+
+ENDM DISPLAY_GRAPH
+
+
+
+
+
